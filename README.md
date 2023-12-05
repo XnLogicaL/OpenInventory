@@ -1,4 +1,4 @@
-# OpenInventory
+# OpenInventory v1.1
 
 OpenInventory is a back-end form of inventory managment for general use.
 Feel free to use, edit, tweak this.
