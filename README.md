@@ -7,6 +7,11 @@ OpenInventory is a back-end form of inventory managment for general use.
 - Dependencies are now built-in
 - Fixed more bugs
 
+# How to Use
+
+## Module
+### Used by requiring the module.
+
 - module:GetInventory(Player Player)
 	gets the targeted player's inventory, if it doesn't exist, creates a new one
 	@returns InventoryInstance
@@ -22,6 +27,9 @@ OpenInventory is a back-end form of inventory managment for general use.
 - module:OverwriteCraftingRecipe(Recipe OldRecipe, Recipe NewRecipe)
 	replaces @OldRecipe's key with @NewRecipe's key
 	@returns nil
+
+## InventoryInstance
+### InventoryInstance is a custom instance type created using ```:GetInventory()```
 
 - InventoryInstance:GetQuantity(string ItemID)
 	returns the targeted items quantity
