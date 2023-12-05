@@ -1,14 +1,15 @@
 --[[
 
 	Author: @XnLogicaL (@CE0_OfTrolling)
-  	Licensed under the MIT License.
+	Licensed under the MIT License.
+	
+	OpenInventory@v1.1
+	
+	Please refer to: 
+	https://github.com/XnLogicaL/OpenInventory/wiki/
+	For documentation.
 
 ]]--
-local Config = {
-	ClientCheck = true, -- Heavily recommended
-	Manager = require(script.Manager),
-	Signal = require(script.Signal)
-}
 export type Item = {
 	ItemID: string?,
 	Quantity: number,
@@ -23,7 +24,7 @@ export type Inventory = {
 	RemoveItem: (ItemID: string, Quantity: number) -> (),
 	ClearInventory: () -> (),
 	Release: () -> (),
-	Clone: () -> {Item},
+	Clone: () -> {any},
 	ItemAdded: RBXScriptSignal,
 	ItemRemoved: RBXScriptSignal,
 	InventoryCleared: RBXScriptSignal,
@@ -36,29 +37,100 @@ export type Recipe = {
 	Input: {Item},
 	Output: {Item},
 }
-export type Module = {
-	GetInventory: (Player) -> Inventory,
-	RemoveInventory: (Player) -> (),
-	SetCraftingRecipe: (CraftInfo: Recipe) -> (),
-	OverwriteCraftingRecipe: (oldRecipe: Recipe, newRecipe: Recipe) -> ()
-}
-
-local EXPECTED_GOT = "%s expected, got %s"
-local FAILED_TO = "could not %s, %s"
-local ATTEMPT_TO = "attempt to %s"
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
+built_in_signal = {
+	new = function()
+		local newSignal: signalType = {
+			_connections = {},
+			Fire = built_in_signal.Fire,
+			Connect = built_in_signal.Connect,
+			Wait = built_in_signal.Wait,
+			Destroy = built_in_signal.Destroy
+		}
+
+		return newSignal
+	end,
+	Connect = function(self, handler: (any) -> (any))
+		local self: signalType = self
+
+		local numConnections: number = #self._connections
+
+		local newConnection: connectionType = {
+			_signal = self,
+			_handler = handler,
+			_connectionIndex = (numConnections + 1),
+			Disconnect = built_in_signal.Disconnect
+		}
+
+		table.insert(self._connections, (numConnections + 1), newConnection)
+
+		return newConnection
+	end,
+	Disconnect = function(self): nil
+		local self: connectionType = self
+
+		local currentSignal: signalType = self._signal
+
+		currentSignal._connections[self._connectionIndex] = nil
+
+		table.clear(self)
+		self = nil :: any
+
+		return nil
+	end,
+	Wait = function(self): any
+		local self: signalType = self
+
+		local thread: thread = coroutine.running()
+
+		local c: connectionType; c = self:Connect(function(...)
+			c:Disconnect()
+			coroutine.resume(thread, ...)
+		end)
+
+		return coroutine.yield()
+	end,
+	Fire = function(self, ...: any): nil
+		local self: signalType = self
+
+		for index: number, connection: connectionType in pairs(self._connections) do
+			connection._handler(...)
+		end
+
+		return nil
+	end,
+	Destroy = function(self): nil
+		local self: signalType = self
+
+		for index: number, connection: connectionType in pairs(self._connections) do
+			connection:Disconnect()
+		end
+
+		table.clear(self)
+		self = nil :: any
+
+		return nil
+	end
+}
+
+local Config = {
+	ClientCheck = true, -- Heavily recommended
+	Manager = {},
+	Signal = built_in_signal
+}
+
 local function String(...: string)
-	return ("[INVENTORYSERVICE] ▶ %s"):format(...)
+	return "[INVENTORYSERVICE] ▶ ".. ...
 end
 
 local function client_check()
 	if Config.ClientCheck then
 		if game:GetService("RunService"):IsClient() then
-			Players.LocalPlayer:Kick(ATTEMPT_TO:format("run server-only module on client"))
+			Players.LocalPlayer:Kick("attempt to run server-only module on client")
 		end
 	end
 end
@@ -116,7 +188,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	function new_inventory:RemoveItem(ItemID, quantity): (string, number) -> () 
 		client_check()
 		local target_item = self.Contents[ItemID]
-		assert(target_item, String(FAILED_TO:format("process item removal", "item quantity is 0")))
+		assert(target_item, String(`Attempt to remove Item with quantity 0`))
 
 		if quantity ~= nil then
 			if target_item == 0 then
@@ -131,10 +203,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	end
 
 	function new_inventory:HasItem(ItemID): () -> boolean
-		if self.Contents[ItemID] ~= nil then
-			return true
-		end
-		return false
+		return self.Contents[ItemID] ~= nil
 	end 
 
 	function new_inventory:ClearInventory(): () -> ()
@@ -150,11 +219,6 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 			task.wait()
 		end
 		table.clear(self)
-	end
-
-	function new_inventory:Clone(): () -> {any}
-		client_check()
-		return self.Contents
 	end
 
 	function new_inventory:Craft(Recipe: Recipe): (Recipe) -> ()
@@ -198,25 +262,25 @@ function Module:RemoveInventory(Player: Player): (Player) -> ()
 		target_inventory:Release()
 		self._manager[Player] = nil
 	else
-		warn(String(("Could not remove inventory of %s, likely due to not being initialized"):format(Player.Name)))
+		error(`[INVENTORYSERVICE] ▶ Attempt to remove inventory before initializing ({Player.Name})`)
 	end
-end               
+end
 
 function Module:SetCraftingRecipe(CraftInfo: Recipe): Recipe
 	client_check()
 	local RecipeType: Recipe = {}
-	assert(typeof(CraftInfo) == typeof(RecipeType), String(EXPECTED_GOT:format("CraftInfo", typeof(CraftInfo))))
-	assert(self._local[CraftInfo.ID] == nil, String("Recipe ID already exists; use :OverwriteRecipe()"))
+	assert(typeof(CraftInfo) == typeof(RecipeType), String(`CraftInfo expected; got {typeof(CraftInfo)}`))
+	assert(self._local[CraftInfo.ID] == nil, String(`Recipe ID already exists; use :OverwriteRecipe()`))
 
 	self._local[CraftInfo.ID] = CraftInfo
 end
 
 function Module:OverwriteCraftingRecipe(Recipe: Recipe, NewRecipe: Recipe)
 	client_check()
-	assert(typeof(NewRecipe) == typeof(Recipe), String(EXPECTED_GOT:format("CraftInfo", typeof(NewRecipe))))
-	assert(self._local[Recipe] ~= nil, String(FAILED_TO:format("overwrite", "recipe is missing or nil")))
+	assert(typeof(NewRecipe) == typeof(Recipe), String(`CraftInfo expected; got {typeof(NewRecipe)}`))
+	assert(self._local[Recipe] ~= nil, String("Could not overwrite; recipe is nil"))
 	self._local[Recipe] = NewRecipe
 end
 
 
-return Module :: Module
+return Module
