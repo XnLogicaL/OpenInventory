@@ -1,7 +1,7 @@
 --[[
 
 	Author: @XnLogicaL (@CE0_OfTrolling)
-  Licensed under the MIT License.
+  	Licensed under the MIT License.
 
 ]]--
 local Config = {
