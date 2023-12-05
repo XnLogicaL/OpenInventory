@@ -40,7 +40,7 @@ InventoryInstance is a custom instance type created using ```:GetInventory()```
 	```@returns nil```
 
 - ```InventoryInstance:RemoveItem(string ItemID, number Quantity)```
-	- @optional quantity
+	- ```@optional quantity```
 	- if no quantity is provided, removes all the itesm under ItemID, if provided, subtracts quantity from the ItemID
 	```@returns nil```
 
