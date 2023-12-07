@@ -37,84 +37,73 @@ export type Recipe = {
 	Input: {Item},
 	Output: {Item},
 }
+export type SignalType = {
+	_connections: {RBXScriptConnection},
+	_bindable: BindableEvent,
+	Fire: (self: SignalType, ...any) -> (...any),
+	Connect: (self: SignalType, _handler: (any) -> (any)) -> ConnectionType,
+	Once: (self: SignalType, _handler: (any) -> (any)) -> ConnectionType,
+	Wait: (self: SignalType) -> (),
+	DisconnectAll: (self: SignalType) -> (),
+}
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
 built_in_signal = {
-	new = function()
-		local newSignal: signalType = {
+	_signals = setmetatable(built_in_signal, {}),
+	new = function(): SignalType
+		local new_sig = {
 			_connections = {},
-			Fire = built_in_signal.Fire,
-			Connect = built_in_signal.Connect,
-			Wait = built_in_signal.Wait,
-			Destroy = built_in_signal.Destroy
+			_bindable = Instance.new("BindableEvent"),
+			Fire = function(self: SignalType, ...)
+				return self._bindable:Fire(...)
+			end,
+			Connect = function(self: SignalType, _handler: ((any) -> any))
+				local connection = self._bindable.Event:Connect(_handler)
+				table.insert(self._connections, connection)
+				return {
+					Disconnect = function(self: RBXScriptConnection)
+						table.remove(getmetatable(built_in_signal)._connections, table.find(getmetatable(built_in_signal)._connections, connection))
+						return self:Disconnect()
+					end,
+				}
+			end,
+			Once = function(self: SignalType, _handler: ((any) -> any))
+				return self._bindable.Event:Once(_handler)
+			end,
+			Wait = function(self: SignalType)
+				local waitingCoroutine = coroutine.running()
+				local done = false
+				self:Once(function(...)
+					if done then
+						return
+					end
+					done = true
+					task.spawn(waitingCoroutine, ...)
+				end)
+				return coroutine.yield()
+			end,
+			Destroy = function(self: SignalType)
+				self:DisconnectAll()
+				self._bindable:Destroy()
+				table.clear(self)
+				return nil
+			end,
+			DisconnectAll = function(self: SignalType)
+				for _, v in self._connections do
+					v:Disconnect()
+				end
+				table.clear(self._connections)
+				return nil
+			end,
 		}
-
-		return newSignal
+		
+		table.insert(built_in_signal._signals, new_sig)
+		
+		return built_in_signal._signals[#built_in_signal._signals]
 	end,
-	Connect = function(self, handler: (any) -> (any))
-		local self: signalType = self
-
-		local numConnections: number = #self._connections
-
-		local newConnection: connectionType = {
-			_signal = self,
-			_handler = handler,
-			_connectionIndex = (numConnections + 1),
-			Disconnect = built_in_signal.Disconnect
-		}
-
-		table.insert(self._connections, (numConnections + 1), newConnection)
-
-		return newConnection
-	end,
-	Disconnect = function(self): nil
-		local self: connectionType = self
-
-		local currentSignal: signalType = self._signal
-
-		currentSignal._connections[self._connectionIndex] = nil
-
-		table.clear(self)
-		self = nil :: any
-
-		return nil
-	end,
-	Wait = function(self): any
-		local self: signalType = self
-
-		local thread: thread = coroutine.running()
-
-		local c: connectionType; c = self:Connect(function(...)
-			c:Disconnect()
-			coroutine.resume(thread, ...)
-		end)
-
-		return coroutine.yield()
-	end,
-	Fire = function(self, ...: any): nil
-		local self: signalType = self
-
-		for index: number, connection: connectionType in pairs(self._connections) do
-			connection._handler(...)
-		end
-
-		return nil
-	end,
-	Destroy = function(self): nil
-		local self: signalType = self
-
-		for index: number, connection: connectionType in pairs(self._connections) do
-			connection:Disconnect()
-		end
-
-		table.clear(self)
-		self = nil :: any
-
-		return nil
-	end
 }
 
 local Config = {
@@ -123,8 +112,8 @@ local Config = {
 	Signal = built_in_signal
 }
 
-local function String(...: string)
-	return "[INVENTORYSERVICE] ▶ ".. ...
+local function get_str(...)
+	return ("[INVENTORYSERVICE] ▶ %s"):format(...)
 end
 
 local function client_check()
@@ -150,7 +139,7 @@ end
 
 function newInventory(Player: Player, Saves: boolean): Inventory
 	client_check()
-	local new_inventory: Inventory = {}
+	local new_inventory = {}
 	new_inventory._saves = Saves or true -- Default: true
 	new_inventory.Contents = {} -- Default: {}
 	new_inventory.Capacity = 15 -- Default: 15
@@ -162,7 +151,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	new_inventory._remove_fail = Config.Signal.new()
 	new_inventory._craft_fail = Config.Signal.new()
 
-	function new_inventory:GetQuantity(ItemID: string): (string) -> number
+	function new_inventory:GetQuantity(ItemID: string)
 		client_check()
 		local target_item: number = self.Contents[ItemID]
 
@@ -173,7 +162,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 		end
 	end
 
-	function new_inventory:AddItem(ItemID, quantity): (string, number) -> () 
+	function new_inventory:AddItem(ItemID, quantity)
 		client_check()
 		local target_item = self.Contents[ItemID]
 		if #self.Contents >= self.Capacity then self._add_fail:Fire("inventory_full") return end
@@ -185,10 +174,10 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 		self.ItemAdded:Fire(ItemID)
 	end
 
-	function new_inventory:RemoveItem(ItemID, quantity): (string, number) -> () 
+	function new_inventory:RemoveItem(ItemID, quantity)
 		client_check()
 		local target_item = self.Contents[ItemID]
-		assert(target_item, String(`Attempt to remove Item with quantity 0`))
+		assert(target_item, get_str(`Attempt to remove Item with quantity 0`))
 
 		if quantity ~= nil then
 			if target_item == 0 then
@@ -202,7 +191,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 		self.ItemRemoving:Fire(ItemID)
 	end
 
-	function new_inventory:HasItem(ItemID): () -> boolean
+	function new_inventory:HasItem(ItemID)
 		return self.Contents[ItemID] ~= nil
 	end 
 
@@ -212,7 +201,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 		self.InventoryCleared:Fire()
 	end
 
-	function new_inventory:Release(): () -> ()
+	function new_inventory:Release()
 		client_check()
 		if self._saves then
 			Module.SaveFunction(Player, new_inventory)
@@ -221,26 +210,28 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 		table.clear(self)
 	end
 
-	function new_inventory:Craft(Recipe: Recipe): (Recipe) -> ()
+	function new_inventory:Craft(RecipeID: string?)
 		client_check()
-		for _, v in pairs(Recipe.Input) do
+		local r = self._local[RecipeID]
+		
+		for _, v in pairs(r.Input) do
 			if self.Contents[v.ItemID] < v.Quantity then
 				self._craft_fail:Fire("insufficient_quantity")
 				return
 			end
 		end
 
-		for _, v in pairs(Recipe.Input) do
+		for _, v in pairs(r.Input) do
 			self:RemoveItem(v.ItemID, v.Quantity)
 		end
-		for _, v in pairs(Recipe.Output) do
+		for _, v in pairs(r.Output) do
 			self:AddItem(v.ItemID, v.Quantity)
 		end
 	end
 
-	table.insert(Module._manager, new_inventory)
+	Module._manager[Player] = new_inventory
 
-	return new_inventory :: Inventory
+	return new_inventory
 end
 
 function Module:GetInventory(Player: Player): (Player) -> Inventory
@@ -269,17 +260,18 @@ end
 function Module:SetCraftingRecipe(CraftInfo: Recipe): Recipe
 	client_check()
 	local RecipeType: Recipe = {}
-	assert(typeof(CraftInfo) == typeof(RecipeType), String(`CraftInfo expected; got {typeof(CraftInfo)}`))
-	assert(self._local[CraftInfo.ID] == nil, String(`Recipe ID already exists; use :OverwriteRecipe()`))
+	assert(typeof(CraftInfo) == typeof(RecipeType), get_str(`CraftInfo expected; got {typeof(CraftInfo)}`))
+	assert(self._local[CraftInfo.ID] == nil, get_str(`Recipe ID already exists; use :OverwriteRecipe()`))
 
 	self._local[CraftInfo.ID] = CraftInfo
 end
 
 function Module:OverwriteCraftingRecipe(Recipe: Recipe, NewRecipe: Recipe)
 	client_check()
-	assert(typeof(NewRecipe) == typeof(Recipe), String(`CraftInfo expected; got {typeof(NewRecipe)}`))
-	assert(self._local[Recipe] ~= nil, String("Could not overwrite; recipe is nil"))
-	self._local[Recipe] = NewRecipe
+	assert(typeof(NewRecipe) == typeof(Recipe), get_str(`CraftInfo expected; got {typeof(NewRecipe)}`))
+	assert(self._local[Recipe] ~= nil, get_str("Could not overwrite; recipe is nil"))
+	
+	self._local[Recipe.ID] = NewRecipe
 end
 
 
