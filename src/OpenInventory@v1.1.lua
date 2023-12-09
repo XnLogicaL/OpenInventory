@@ -17,9 +17,6 @@
 	Step 2: Use InventoryInstance:AddItem(ItemID, Quantity) to add items to the players inventory.
 	Step 3: Use InventoryInstance:RemoveItem(ItemID, Quantity) to remove items from the players inventory.
 	
-	to hd application reader:
-	bro how am I supposed to explain this in more detail? I literally made a wiki just for this module
-	
 ]]--
 -- Types
 export type Item = {
