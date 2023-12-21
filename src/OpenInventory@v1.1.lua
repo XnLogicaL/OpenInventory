@@ -3,7 +3,7 @@
 	Author: @XnLogicaL (@CE0_OfTrolling)
 	Licensed under the MIT License.
 	
-	OpenInventory@v1.1
+	OpenInventory@v1.1a HOTFIX
 	
 	Please refer to: 
 	https://github.com/XnLogicaL/OpenInventory/wiki/
@@ -13,7 +13,7 @@
 	Step 1: call InventoryInstance = module:GetInventory(Player)
 		- If the player has an inventory, it will return a table with all items.
 		- If the player does not have an inventory, it will create one and return an empty table.
-	Step 1.5: Set the module.SaveFunction to your own data saver
+	Step 1.5: Set the module.SaveFunction to your own data saver (Optional)
 	Step 2: Use InventoryInstance:AddItem(ItemID, Quantity) to add items to the players inventory.
 	Step 3: Use InventoryInstance:RemoveItem(ItemID, Quantity) to remove items from the players inventory.
 	
@@ -50,17 +50,16 @@ export type SignalType = {
 	_connections: {RBXScriptConnection},
 	_bindable: BindableEvent,
 	Fire: (self: SignalType, ...any) -> (...any),
-	Connect: (self: SignalType, _handler: (any) -> (any)) -> ConnectionType,
-	Once: (self: SignalType, _handler: (any) -> (any)) -> ConnectionType,
+	Connect: (self: SignalType, _handler: (any) -> (any)) -> RBXScriptConnection,
+	Once: (self: SignalType, _handler: (any) -> (any)) -> RBXScriptConnection,
 	Wait: (self: SignalType) -> (),
 	DisconnectAll: (self: SignalType) -> (),
 }
 
 -- Constants
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local ServerStorage = game:GetService("ServerStorage")
 local Players = game:GetService("Players")
 
+local built_in_signal = {}
 built_in_signal = { -- Standard signal module, uses bindables
 	_signals = setmetatable(built_in_signal, {}),
 	new = function(): SignalType
@@ -74,7 +73,7 @@ built_in_signal = { -- Standard signal module, uses bindables
 				local connection = self._bindable.Event:Connect(_handler)
 				table.insert(self._connections, connection)
 				return {
-					Disconnect = function(self: RBXScriptConnection)
+					Disconnect = function(_self: RBXScriptConnection)
 						table.remove(
 							getmetatable(built_in_signal)._connections, 
 							table.find(
@@ -82,7 +81,7 @@ built_in_signal = { -- Standard signal module, uses bindables
 								connection
 							)
 						)
-						return self:Disconnect()
+						return _self:Disconnect()
 					end,
 				}
 			end,
@@ -151,17 +150,10 @@ local function client_check()
 	end
 end
 
-local function assert_string(condition: boolean, str: string): string | nil
-	if condition == (false or nil) then
-		return str
-	end
-	return nil
-end
-
 -- Module part
 local Module = {_manager = Config.Manager, _local = {}}
 Module.__index = Module
-Module.SaveFunction = function(Player: Player, InventoryToSave: Inventory)
+Module.SaveFunction = function(_player: Player, _inventoryToSave: Inventory)
 	-- TODO: ADD SAVE FUNCTIONALITY WITH YOUR PREFERED DATASTORE SERVICE.
 end
 
@@ -193,7 +185,10 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	function new_inventory:AddItem(ItemID, quantity)
 		client_check()
 		local target_item = self.Contents[ItemID]
-		if #self.Contents >= self.Capacity then self._add_fail:Fire("inventory_full") return end -- checks if the inventory is full
+		if #self.Contents >= self.Capacity then -- checks if the inventory is full
+			self._add_fail:Fire("inventory_full")
+			return 
+		end
 		if target_item ~= nil then
 			self.Contents[ItemID] += quantity -- adds the amount of items to the inventory
 		else
@@ -348,4 +343,24 @@ function Module:OverwriteCraftingRecipe(Recipe: Recipe, NewRecipe: Recipe)
 	self._local[Recipe.ID] = NewRecipe -- Appends the recipe to local recipes
 end
 
-return Module
+return setmetatable({}, {
+	__index = function(index, _, _)
+		if Module[index] then
+			return Module[index]
+		else
+			return error(
+				COULD_NOT:format(
+					"fetch index",
+					"are you sure the index is correct?"
+				)
+			)
+		end
+	end,
+	__newindex = function(_, _)
+		return error(
+			ATTEMPT_TO:format(
+				"add new index during run time, please edit source instead."
+			)
+		)
+	end
+})
