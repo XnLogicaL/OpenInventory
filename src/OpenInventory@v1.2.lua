@@ -333,7 +333,7 @@ function Module:OverwriteCraftingRecipe(Recipe: Recipe, NewRecipe: Recipe)
 end
 
 return setmetatable({}, {
-	__index = function(index, _, _)
+	__index = function(_, index, _)
 		if RunService:IsClient() and Config.ClientCheck then
 			return error(
 				ATTEMPT_TO:format(
