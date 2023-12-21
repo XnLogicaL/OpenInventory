@@ -3,7 +3,7 @@
 	Author: @XnLogicaL (@CE0_OfTrolling)
 	Licensed under the MIT License.
 	
-	OpenInventory@v1.1a HOTFIX
+	OpenInventory@v1.3 HOTFIX
 	
 	Please refer to: 
 	https://github.com/XnLogicaL/OpenInventory/wiki/
@@ -58,6 +58,7 @@ export type SignalType = {
 
 -- Constants
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 
 local built_in_signal = {}
 built_in_signal = { -- Standard signal module, uses bindables
@@ -138,18 +139,6 @@ local function tag(...)
 	return ("[INVENTORYSERVICE] ▶ %s"):format(...)
 end
 
-local function client_check()
-	if Config.ClientCheck then
-		if game:GetService("RunService"):IsClient() then
-			Players.LocalPlayer:Kick(
-				tag(
-					"run server-only module on client"
-				)
-			)
-		end
-	end
-end
-
 -- Module part
 local Module = {_manager = Config.Manager, _local = {}}
 Module.__index = Module
@@ -158,7 +147,7 @@ Module.SaveFunction = function(_player: Player, _inventoryToSave: Inventory)
 end
 
 function newInventory(Player: Player, Saves: boolean): Inventory
-	client_check()
+	
 	local new_inventory = {}
 	new_inventory._saves = Saves or true -- Default: true
 	new_inventory.Contents = {} -- Default: {}
@@ -172,7 +161,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	new_inventory._craft_fail = Config.Signal.new()
 
 	function new_inventory:GetQuantity(ItemID: string) -- Returns the quantity of the provided ItemID
-		client_check()
+		
 		local target_item: number = self.Contents[ItemID]
 
 		if target_item ~= nil then -- If the item exists, returns it's table value
@@ -183,7 +172,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	end
 
 	function new_inventory:AddItem(ItemID, quantity)
-		client_check()
+		
 		local target_item = self.Contents[ItemID]
 		if #self.Contents >= self.Capacity then -- checks if the inventory is full
 			self._add_fail:Fire("inventory_full")
@@ -198,7 +187,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	end
 
 	function new_inventory:RemoveItem(ItemID, quantity)
-		client_check()
+		
 		local target_item = self.Contents[ItemID]
 		assert( -- Checks if target item is nil or not
 			target_item,
@@ -226,13 +215,13 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	end 
 
 	function new_inventory:ClearInventory() -- Sets all the item's keys to nil, essentially removing them
-		client_check()
+		
 		table.clear(self.Contents)
 		self.InventoryCleared:Fire()
 	end
 
 	function new_inventory:Release()
-		client_check()
+		
 		if self._saves then -- Checks if the inventory saves or not
 			Module.SaveFunction(Player, new_inventory) -- Executes the save function
 			task.wait()
@@ -241,7 +230,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 	end
 
 	function new_inventory:Craft(RecipeID: string?)
-		client_check()
+		
 		local r = self._local[RecipeID]
 		
 		for _, v in pairs(r.Input) do -- Loops through the input property of the recipe
@@ -265,7 +254,7 @@ function newInventory(Player: Player, Saves: boolean): Inventory
 end
 
 function Module:GetInventory(Player: Player): (Player) -> Inventory
-	client_check()
+	
 	local target_inventory = self._manager[Player]
 	if target_inventory ~= nil then -- Checks if the target inventory is nil or not
 		return target_inventory -- If it's not, returns it
@@ -277,7 +266,7 @@ function Module:GetInventory(Player: Player): (Player) -> Inventory
 end
 
 function Module:RemoveInventory(Player: Player): (Player) -> ()
-	client_check()
+	
 	local target_inventory = self._manager[Player]
 	if target_inventory ~= nil then -- Checks if the Inventory you're attempting to remove is nil or not
 		target_inventory:Release() -- Saves and dumps the inventory
@@ -295,7 +284,7 @@ function Module:RemoveInventory(Player: Player): (Player) -> ()
 end
 
 function Module:SetCraftingRecipe(CraftInfo: Recipe): Recipe
-	client_check()
+	
 	local RecipeType: Recipe = {} -- Just an empty value with a type, thank roblox for making types inconsistent af
 	assert(
 		typeof(CraftInfo) == typeof(RecipeType), -- Checks if the provided recipe is actually a recipe or not
@@ -320,7 +309,7 @@ function Module:SetCraftingRecipe(CraftInfo: Recipe): Recipe
 end
 
 function Module:OverwriteCraftingRecipe(Recipe: Recipe, NewRecipe: Recipe)
-	client_check()
+	
 	assert( -- Checks if the provided recipe is acutally a recipe or not
 		typeof(NewRecipe) == typeof(Recipe), 
 		tag(
@@ -345,6 +334,13 @@ end
 
 return setmetatable({}, {
 	__index = function(index, _, _)
+		if RunService:IsClient() and Config.ClientCheck then
+			return error(
+				ATTEMPT_TO:format(
+					"index from client while client check is enabled."
+				)
+			)
+		end
 		if Module[index] then
 			return Module[index]
 		else
