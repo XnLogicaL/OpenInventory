@@ -262,7 +262,7 @@ function Module:GetInventory(Player: Player): (Player) -> Inventory
 		self._manager[Player] = newInventory(Player) -- If it is, generates a new one and appends it into the manager
 	end
 
-	return target_inventory
+	return self._manager[Player]
 end
 
 function Module:RemoveInventory(Player: Player): (Player) -> ()
