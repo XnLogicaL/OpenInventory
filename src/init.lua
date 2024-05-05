@@ -12,8 +12,9 @@
 	- OpenInventory now uses stringified tables instead of table objects (performant in terms of memory)
 	- Completely rewritten architecture
 	- Divided the module into smaller segments
-	
+
 ]=]
+
 if game:GetService("RunService"):IsClient() then
 	return nil;
 end
@@ -41,13 +42,6 @@ local _InventoryType: TypeDefinitions.Inventory = nil
 local _RecipeType: TypeDefinitions.Recipe = nil
 local _ItemType: TypeDefinitions.Item = nil
 
---[=[
-
-	@interface OpenInventory
-
-	The main class of this module.
-
-]=]
 local Class = {  }
 Class.__index = Class
 Class._localInventoryIndex = Manager
@@ -56,17 +50,6 @@ Class._localRecipeIndex = {  }
 Class.RecipeClass = require(Components.RecipeClass)
 Class.ItemClass = require(Components.ItemClass)
 
---[=[
-
-	@method private SaveFunction
-	@within interface OpenInventory
-
-	@param Player _player
-	@param Inventory _inventoryToSave
-
-	An example save function callback. I recommend implementing your own
-
-]=]
 Class.SaveFunction = function(_player: Player, _inventoryToSave: TypeDefinitions.Inventory)
 	-- TODO: ADD SAVE FUNCTIONALITY WITH YOUR PREFERED DATASTORE SERVICE.
 	for i=1, 5 do
@@ -82,21 +65,6 @@ Class.SaveFunction = function(_player: Player, _inventoryToSave: TypeDefinitions
 	end
 end
 
---[=[
-
-	@method private newInventory
-	@within <file>
-	
-	@param Player Player
-	@param Boolean Saves
-	@param Boolean UseCallBacks
-
-	@return Inventory
-
-	The private inventory getter. 
-	Not intended to be used standalone.
-
-]=]
 local function newInventory(Player: Player, Saves: boolean?, UseCallBacks: boolean?): TypeDefinitions.Inventory
 	local functions: TypeDefinitions._functions = require(Components.InventoryFunctions)
 	local self = setmetatable({}, Class)
@@ -134,27 +102,6 @@ local function newInventory(Player: Player, Saves: boolean?, UseCallBacks: boole
 	return self :: TypeDefinitions.Inventory
 end
 
---[=[
-
-	@method public GetInventory
-	@within interface OpenInventory
-
-	@param Player Player
-
-	@return Inventory
-
-	Example implementation:
-	```lua
-		local Players = game:GetService("Players")
-		local OpenInventory = require(...)
-
-		Players.PlayerAdded:Connect(function(Player)
-			local Inventory = OpenInventory:GetInventory(Player)
-			Inventory:AddItem(<SomeItem>, <SomeQuantity>)
-		end)
-	```
-
-]=]
 function Class:GetInventory(Player: Player, Saves: boolean?, UseCallBacks: boolean?): TypeDefinitions.Inventory?
 	local inventory = self._localInventoryIndex[Player]
 	assert(inventory, Tag(COULD_NOT_FETCH_INVENTORY:format(Player.Name)))
@@ -165,26 +112,6 @@ function Class:GetInventory(Player: Player, Saves: boolean?, UseCallBacks: boole
 	return self._localInventoryIndex[Player] :: TypeDefinitions.Inventory
 end
 
---[=[
-
-	@method public RemoveInventory
-	@within interface OpenInventory
-
-	@param Player Player
-
-	Highly recommended to use due to the risk of memory leaks.
-	Example implementation:
-	```lua
-		local Players = game:GetService("Players")
-		local OpenInventory = require(...)
-
-		Players.PlayerRemovingConnect(function(Player)
-			-- to prevent memory leaks or overusage
-			OpenInventory:RemoveInventory(Player)
-		end)
-	```
-
-]=]
 function Class:RemoveInventory(Player: Player): ()
 	local inventory = self._localInventoryIndex[Player]
 	assert(inventory, Tag(COULD_NOT_REMOVE_INVENTORY:format(Player.Name)))
@@ -204,14 +131,6 @@ function Class:RemoveInventory(Player: Player): ()
 	end
 end
 
---[=[
-
-	@method public SetCraftingRecipe
-	@within interface OpenInventory
-
-	@param Recipe Recipe
-
-]=]
 function Class:SetCraftingRecipe(Recipe: TypeDefinitions.Recipe): ()
 	assert(typeof(Recipe) == typeof(_RecipeType), Tag(EXPECTED_RECIPE_GOT:format(typeof(Recipe))))
 	local TempContents = HTTPService:JSONDecode(self._localRecipeIndex)
