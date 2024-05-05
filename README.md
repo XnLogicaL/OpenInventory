@@ -8,8 +8,4 @@ With OpenInventory, you're not just limited to player inventories, you can make 
 
 # Change Log
 
-- Rewrote the entire module
-- Made types more consistent
-- Further table memory optimizations using ```:JSONEncode() and :JSONDecode()```
-- Switched to a more reliable signal class
-- Added asynchronization using the promise class
+- N/A
