@@ -1,6 +1,4 @@
-# OpenInventory v2.0
-
-## OpenInventory has been deprecated and is highly recommended to be replaced by another framework as this was just a project to teach me how to make production modules.
+# [Deprecated] OpenInventory v2.0
 
 OpenInventory is a back-end form of inventory managment for general use in Roblox.
 This provides which many open-source inventory systems don't, *Customizability*.
